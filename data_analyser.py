@@ -75,12 +75,19 @@ class DataAnalyser:
                 ])
         print(f"Processed calibration and filtering data saved to {processed_csv_path}")
 
-        # Render benchmark plot
-        plot_path = 'data/benchmark_standard_samples.png'
+        # Render benchmark plots (both samples mode and time mode)
+        samples_plot_path = 'data/benchmark_standard_samples.png'
         self.plot_comparison(
             timestamps, actuals, raw_dist, avg_5, med_5, med_7, 
             ema_2, hybrid, kalman, mad, reg_dist, 
-            "Standard 340 m/s - Samples", plot_path
+            "Standard 340 m/s - Samples", samples_plot_path, x_axis_mode='samples'
+        )
+
+        time_plot_path = 'data/benchmark_standard.png'
+        self.plot_comparison(
+            timestamps, actuals, raw_dist, avg_5, med_5, med_7, 
+            ema_2, hybrid, kalman, mad, reg_dist, 
+            "Standard 340 m/s - Time", time_plot_path, x_axis_mode='time'
         )
 
     @staticmethod
@@ -152,10 +159,14 @@ class DataAnalyser:
             filtered.append(sum(clean_window) / len(clean_window))
         return filtered
 
-    def plot_comparison(self, ts, actuals, raw_dist, avg_5, med_5, med_7, ema_2, hybrid, kalman, mad, reg, title_suffix, filename):
+    def plot_comparison(self, ts, actuals, raw_dist, avg_5, med_5, med_7, ema_2, hybrid, kalman, mad, reg, title_suffix, filename, x_axis_mode='samples'):
         N = len(ts)
-        x_values = list(range(1, N + 1))
-        x_label = 'Sample Number'
+        if x_axis_mode == 'time':
+            x_values = [(t - ts[0]) / 1000.0 for t in ts]
+            x_label = 'Time (seconds)'
+        else:
+            x_values = list(range(1, N + 1))
+            x_label = 'Sample Number'
 
         plt.figure(figsize=(12, 7))
         plt.plot(x_values, actuals, color='#2d6a4f', label='True Distance (Target)', linewidth=3, linestyle='--')
