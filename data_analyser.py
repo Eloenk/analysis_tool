@@ -75,19 +75,18 @@ class DataAnalyser:
                 ])
         print(f"Processed calibration and filtering data saved to {processed_csv_path}")
 
-        # Render benchmark plots (both samples mode and time mode)
+        # Render benchmark plots (both samples mode and 4-subplots comparison)
         samples_plot_path = 'data/benchmark_standard_samples.png'
-        self.plot_comparison(
+        self.plot_samples_comparison(
             timestamps, actuals, raw_dist, avg_5, med_5, med_7, 
             ema_2, hybrid, kalman, mad, reg_dist, 
-            "Standard 340 m/s - Samples", samples_plot_path, x_axis_mode='samples'
+            "Standard 340 m/s - Samples", samples_plot_path
         )
 
-        time_plot_path = 'data/benchmark_standard.png'
-        self.plot_comparison(
-            timestamps, actuals, raw_dist, avg_5, med_5, med_7, 
-            ema_2, hybrid, kalman, mad, reg_dist, 
-            "Standard 340 m/s - Time", time_plot_path, x_axis_mode='time'
+        subplots_plot_path = 'data/benchmark_standard.png'
+        self.plot_subplots_comparison(
+            timestamps, actuals, raw_dist, med_5, med_7, 
+            ema_2, hybrid, kalman, subplots_plot_path
         )
 
     @staticmethod
@@ -159,14 +158,10 @@ class DataAnalyser:
             filtered.append(sum(clean_window) / len(clean_window))
         return filtered
 
-    def plot_comparison(self, ts, actuals, raw_dist, avg_5, med_5, med_7, ema_2, hybrid, kalman, mad, reg, title_suffix, filename, x_axis_mode='samples'):
+    def plot_samples_comparison(self, ts, actuals, raw_dist, avg_5, med_5, med_7, ema_2, hybrid, kalman, mad, reg, title_suffix, filename):
         N = len(ts)
-        if x_axis_mode == 'time':
-            x_values = [(t - ts[0]) / 1000.0 for t in ts]
-            x_label = 'Time (seconds)'
-        else:
-            x_values = list(range(1, N + 1))
-            x_label = 'Sample Number'
+        x_values = list(range(1, N + 1))
+        x_label = 'Sample Number'
 
         plt.figure(figsize=(12, 7))
         plt.plot(x_values, actuals, color='#2d6a4f', label='True Distance (Target)', linewidth=3, linestyle='--')
@@ -194,6 +189,72 @@ class DataAnalyser:
         plt.tight_layout()
         plt.savefig(filename, dpi=300)
         print(f"Benchmark plot saved to {filename}")
+        plt.show()
+
+    def plot_subplots_comparison(self, ts, actuals, raw_dist, med_5, med_7, ema_2, hybrid, kalman, filename):
+        sample_index = list(range(1, len(ts) + 1))
+        
+        fig, axs = plt.subplots(2, 2, figsize=(15, 10))
+        
+        # Subplot 1: Raw Sensor Data vs True Distance
+        axs[0, 0].plot(sample_index, actuals, color='#2d6a4f', label='True Distance', linewidth=3, linestyle='--')
+        axs[0, 0].plot(sample_index, raw_dist, color='#f28482', label='Raw Sensor', linewidth=1.5, alpha=0.6)
+        axs[0, 0].set_title('Raw Sensor Data vs True Distance', fontsize=12, fontweight='bold')
+        axs[0, 0].set_ylabel('Distance (cm)', fontsize=10)
+        axs[0, 0].grid(True, linestyle=':', alpha=0.5)
+        axs[0, 0].legend(loc='upper right', framealpha=0.9, facecolor='#ffffff')
+        axs[0, 0].spines['top'].set_visible(False)
+        axs[0, 0].spines['right'].set_visible(False)
+
+        # Subplot 2: Median Filter Comparison
+        axs[0, 1].plot(sample_index, actuals, color='#2d6a4f', label='True', linewidth=3, linestyle='--')
+        axs[0, 1].plot(sample_index, med_5, color='#1d3557', label='Median (5)', linewidth=1.5)
+        axs[0, 1].plot(sample_index, med_7, color='#457b9d', label='Median (7)', linewidth=1.5, linestyle='--')
+        axs[0, 1].set_title('Median Filter Comparison', fontsize=12, fontweight='bold')
+        axs[0, 1].set_ylabel('Distance (cm)', fontsize=10)
+        axs[0, 1].grid(True, linestyle=':', alpha=0.5)
+        axs[0, 1].legend(loc='upper right', framealpha=0.9, facecolor='#ffffff')
+        axs[0, 1].spines['top'].set_visible(False)
+        axs[0, 1].spines['right'].set_visible(False)
+
+        # Subplot 3: Continuous Smoothing Filters
+        axs[1, 0].plot(sample_index, actuals, color='#2d6a4f', label='True', linewidth=3, linestyle='--')
+        axs[1, 0].plot(sample_index, ema_2, color='#f4a261', label='EMA (α=0.2)', linewidth=1.5)
+        axs[1, 0].plot(sample_index, hybrid, color='#7209b7', label='Hybrid Median→EMA', linewidth=2)
+        axs[1, 0].plot(sample_index, kalman, color='#00b4d8', label='Kalman Filter', linewidth=1.5, linestyle='--')
+        axs[1, 0].set_title('Continuous Smoothing Filters', fontsize=12, fontweight='bold')
+        axs[1, 0].set_xlabel('Sample Number', fontsize=10)
+        axs[1, 0].set_ylabel('Distance (cm)', fontsize=10)
+        axs[1, 0].grid(True, linestyle=':', alpha=0.5)
+        axs[1, 0].legend(loc='upper right', framealpha=0.9, facecolor='#ffffff')
+        axs[1, 0].spines['top'].set_visible(False)
+        axs[1, 0].spines['right'].set_visible(False)
+
+        # Subplot 4: Error Comparison (Zoomed Section)
+        raw_err = [r - a for r, a in zip(raw_dist, actuals)]
+        med_5_err = [m - a for m, a in zip(med_5, actuals)]
+        hybrid_err = [h - a for h, a in zip(hybrid, actuals)]
+        zero_baseline = [0.0] * len(actuals)
+        
+        axs[1, 1].plot(sample_index, zero_baseline, color='#2d6a4f', linewidth=1.5)
+        axs[1, 1].plot(sample_index, raw_err, color='#f28482', label='Raw Error', linewidth=1.0, alpha=0.5)
+        axs[1, 1].plot(sample_index, med_5_err, color='#1d3557', label='Median (5)', linewidth=1.5)
+        axs[1, 1].plot(sample_index, hybrid_err, color='#7209b7', label='Hybrid', linewidth=1.5)
+        axs[1, 1].set_title('Error Comparison (Zoomed Section)', fontsize=12, fontweight='bold')
+        axs[1, 1].set_xlabel('Sample Number', fontsize=10)
+        axs[1, 1].set_ylabel('Error (cm)', fontsize=10)
+        axs[1, 1].grid(True, linestyle=':', alpha=0.5)
+        axs[1, 1].legend(loc='upper right', framealpha=0.9, facecolor='#ffffff')
+        axs[1, 1].set_xlim(50, 150)
+        axs[1, 1].spines['top'].set_visible(False)
+        axs[1, 1].spines['right'].set_visible(False)
+
+        fig.suptitle('Ultrasonic Sensor Filtering Comparison\n(Standard Speed of Sound (340 m/s))', fontsize=14, fontweight='bold')
+        
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.90)
+        plt.savefig(filename, dpi=300)
+        print(f"Subplot benchmark saved to {filename}")
         plt.show()
 
 def main():
